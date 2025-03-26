@@ -12,6 +12,13 @@ DigitalEncoder left_encoder(FEHIO::P1_7);
 FEHMotor right_motor(FEHMotor::Motor2,9.0);
 FEHMotor left_motor(FEHMotor::Motor0,9.0);
 
+// Declarations for analog optosensors
+AnalogInputPin right_opto(FEHIO::P2_0);
+AnalogInputPin middle_opto(FEHIO::P2_1);
+AnalogInputPin left_opto(FEHIO::P2_2);
+FEHMotor right_motor(FEHMotor::Motor0,9.0);
+FEHMotor left_motor(FEHMotor::Motor2,9.0);
+
 AnalogInputPin lightsensor(FEHIO::P1_0);
 
 void forward(int percent, int counts) //using encoders
@@ -99,8 +106,6 @@ void turnRight(int percent, int counts) //using encoders
 void lightSensor(double initRed){
     float colorValue = lightsensor.Value();
     colorValue = lightsensor.Value();
-
-    
     
     for(int i = 0; i < 5;i++){
         //red
@@ -134,6 +139,79 @@ int starting(){
     return startingRed;
 }
 
+enum LineStates {
+    MIDDLE,
+    RIGHT,
+    LEFT, NONE
+   };
+
+void lineFollowing(int percent){
+    int state = MIDDLE;
+
+    while (true) { // I will follow this line forever!
+        switch(state) {
+        // If I am in the middle of the line...
+        case MIDDLE:
+        // Set motor powers for driving straight
+        right_motor.SetPercent(percent);
+        left_motor.SetPercent(-percent);
+        LCD.WriteLine("Right opto");
+        LCD.WriteLine(right_opto.Value());
+        LCD.WriteLine("Middle Opto");
+        LCD.WriteLine(middle_opto.Value());
+        LCD.WriteLine("Left opto");
+        LCD.WriteLine(left_opto.Value());
+        /* Drive */
+        if (right_opto.Value() <= 0.85) {
+            state = RIGHT; // update a new state
+        }
+        /* Code for if left sensor is on the line */
+        if (left_opto.Value() <= 0.85) {
+            state = LEFT; // update a new state
+        }
+        if(middle_opto.Value() >= 0.3){
+            state = NONE;
+        }
+        break;
+        // If the right sensor is on the line...
+        case RIGHT:
+        // Set motor powers for right turn
+        right_motor.SetPercent(0);
+        left_motor.SetPercent(25);
+        /* Drive */
+        if(right_opto.Value() <= 1.6) {
+        /* update a new state */
+            state = MIDDLE;
+        }
+        break;
+        // If the left sensor is on the line...
+        case LEFT:
+        /* Mirror operation of RIGHT state */
+        // Set motor powers for right turn
+        left_motor.SetPercent(0);
+        right_motor.SetPercent(-25);
+        /* Drive */
+        if(left_opto.Value() >= 1) {
+        /* update a new state */
+            state = MIDDLE;
+        }
+        break;
+        /*When there's no line */
+        case NONE:
+        /* Mirror operation of RIGHT state */
+        // Set motor powers for right turn
+        left_motor.SetPercent(0);
+        right_motor.SetPercent(0);
+        /* Drive */
+        if(right_opto.Value() <= 0.2) {
+            /* update a new state */
+                state = MIDDLE;
+            }
+        break;
+        }
+    }
+}
+
 
 int main(void)
 {
@@ -149,96 +227,18 @@ int main(void)
     LCD.Clear(BLACK);
     LCD.SetFontColor(WHITE);
 
-    
     //waiting for the light
-    double red = starting();
+    //double red = starting();
 
-    LCD.WriteLine("starting: ");
-    LCD.WriteLine(red);
+    //LCD.WriteLine("starting: ");
+    //LCD.WriteLine(red);
+    lineFollowing(motor_percent);
 
-    //lining up for the ramp
-    forward(motor_percent, expected_counts_per_inch * 0.25);
-    Sleep(1.0);
-    turnRight(motor_percent*0.5, degrees * 45);
-    Sleep(1.0);   
-    forward(motor_percent, expected_counts_per_inch * 3.75);
-    Sleep(1.0);   
-    turnRight(motor_percent*0.5, degrees * 90);   
-    Sleep(1.0);   
-    forward(motor_percent, expected_counts_per_inch * 5.5);
-    Sleep(1.0);   
-    turnLeft(motor_percent*0.5, degrees * 88.5);
-    Sleep(1.0);
 
-    // Going up the ramp
-    forward(motor_percent, expected_counts_per_inch * 43);
-    Sleep(1.0);
-
-    // Lining up for clicking button
-    backward(18, expected_counts_per_inch * 7);
-    Sleep(1.0);
-    turnRight(motor_percent*0.5, degrees * 90);
-    Sleep(1.0);
-    forward(motor_percent, expected_counts_per_inch * 10);
-    Sleep(1.0);
-
-    // Approaching the button
-    backward(18, expected_counts_per_inch * 17.75);
-    Sleep(1.0);
-
-    double light = lightsensor.Value();
-
-    // red
-    if (light < 0.26){
-        LCD.Clear();
-        LCD.WriteLine(light);
-        Sleep(0.5);
-        LCD.SetBackgroundColor(RED);
-        LCD.WriteLine("Detected Red");
-
-        turnRight(motor_percent, degrees * 90);
-        Sleep(1.0);
-        backward(motor_percent, expected_counts_per_inch * 2);
-        Sleep(1.0);
-        turnLeft(motor_percent, degrees * 90);
-        backward(motor_percent, expected_counts_per_inch * 5.5);
-        
-        // forward(motor_percent, expected_counts_per_inch * 7);
-        // turnLeft(motor_percent, degrees * 10);
-
-    }
-    // Blue
-     else if (light >= 0.3){
-        LCD.Clear();
-        LCD.WriteLine(light);
-        Sleep(0.5);
-        LCD.SetBackgroundColor(BLUE);
-        LCD.WriteLine("Detected blue!");
-        
-        turnRight(motor_percent, degrees * 88.5);
-        Sleep(1.0);
-        forward(motor_percent, expected_counts_per_inch * 3);
-        Sleep(1.0);
-        turnLeft(motor_percent, degrees * 90);
-        Sleep(1.0);
-        backward(motor_percent, expected_counts_per_inch * 5.5);
-
-        // Sleep(1.0);
-        // forward(motor_percent, expected_counts_per_inch * 7);
-        // Sleep(1.0);
-        // turnRight(motor_percent, degrees * 10);
-
-    }
 
     // backward(motor_percent, expected_counts_per_inch * 17.5);
     // Sleep(1.0);
-    LCD.WriteLine("starting: ");
-    LCD.WriteLine(red);
-
-
-
-
-
-
+    //LCD.WriteLine("starting: ");
+    //LCD.WriteLine(red);
     return 0;
 }
